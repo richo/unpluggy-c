@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <signal.h>
+#include <sys/stat.h>
 
 #include <CoreFoundation/CoreFoundation.h>
 
@@ -23,12 +24,21 @@ void handler(int sig)
 }
 
 static char* cmd = NULL;
+static uid_t uid = -1;
 
 void removed(void *rc, io_service_t svc, natural_t type, void *arg)
 {
+    struct stat buf;
     if (type == kIOMessageServiceIsTerminated) {
-        fprintf(stderr, "Device removed.\n");
-        system(cmd);
+        fprintf(stderr, "[+] Device removed.\n");
+        if (stat("/dev/console", &buf) == 0) {
+            fprintf(stderr, "[+] Console owned by %d\n", buf.st_uid);
+            if (buf.st_uid == uid && cmd) {
+                system(cmd);
+            }
+        } else {
+            fprintf(stderr, "[!] Couldn't open /dev/console\n");
+        }
     }
 }
 
@@ -36,7 +46,7 @@ void added(void *rc, io_iterator_t it)
 {
     io_service_t device;
     while ((device = IOIteratorNext(it))) {
-        printf("Device added.\n");
+        printf("[+] Device added.\n");
 
         IOServiceAddInterestNotification(port, device, kIOGeneralInterest, removed, NULL, &iter);
 
@@ -48,6 +58,10 @@ int main(int argc, char** argv) {
     if (argc > 1) {
         cmd = argv[1];
     }
+
+    uid = getuid();
+
+    fprintf(stderr, "[+] Starting unpluggy, only locking for uid: %d\n", uid);
 
     CFMutableDictionaryRef matching;
     CFNumberRef nr;
