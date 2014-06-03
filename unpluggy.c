@@ -23,7 +23,6 @@ void handler(int sig)
     exit(0);
 }
 
-static char* cmd = NULL;
 static uid_t uid = -1;
 
 void removed(void *rc, io_service_t svc, natural_t type, void *arg)
@@ -33,8 +32,9 @@ void removed(void *rc, io_service_t svc, natural_t type, void *arg)
         fprintf(stderr, "[+] Device removed.\n");
         if (stat("/dev/console", &buf) == 0) {
             fprintf(stderr, "[+] Console owned by %d\n", buf.st_uid);
-            if (buf.st_uid == uid && cmd) {
-                system(cmd);
+            if (buf.st_uid == uid) {
+                /* TODO: Poke at CGSession in a less janky fashion */
+                system("\"/System/Library/CoreServices/Menu Extras/User.menu/Contents/Resources/CGSession\" -suspend");
             }
         } else {
             fprintf(stderr, "[!] Couldn't open /dev/console\n");
@@ -55,10 +55,6 @@ void added(void *rc, io_iterator_t it)
 }
 
 int main(int argc, char** argv) {
-    if (argc > 1) {
-        cmd = argv[1];
-    }
-
     uid = getuid();
 
     fprintf(stderr, "[+] Starting unpluggy, only locking for uid: %d\n", uid);
