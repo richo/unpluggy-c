@@ -9,11 +9,6 @@
 #include <IOKit/IOCFPlugIn.h>
 #include <IOKit/usb/IOUSBLib.h>
 
-void bail(const char* msg) {
-    fprintf(stderr, "%s\n", msg);
-    exit(1);
-}
-
 static IONotificationPortRef port;
 static io_iterator_t iter;
 static CFRunLoopRef loop;
