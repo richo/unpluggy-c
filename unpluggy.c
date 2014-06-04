@@ -23,15 +23,22 @@ void handler(int sig)
     exit(0);
 }
 
+#ifdef DEBUG
+#define debug(...) fprintf(stderr, __VA_ARGS__)
+#else
+#define debug(...)  do { \
+    if (getenv("UNPLUGGY_DEBUG")) fprintf(stderr, __VA_ARGS__); } while(0)
+#endif
+
 static uid_t uid = -1;
 
 void removed(void *rc, io_service_t svc, natural_t type, void *arg)
 {
     struct stat buf;
     if (type == kIOMessageServiceIsTerminated) {
-        fprintf(stderr, "[+] Device removed.\n");
+        debug("[+] Device removed.\n");
         if (stat("/dev/console", &buf) == 0) {
-            fprintf(stderr, "[+] Console owned by %d\n", buf.st_uid);
+            debug("[+] Console owned by %d\n", buf.st_uid);
             if (buf.st_uid == uid) {
                 /* TODO: Poke at CGSession in a less janky fashion */
                 system("\"/System/Library/CoreServices/Menu Extras/User.menu/Contents/Resources/CGSession\" -suspend");
@@ -46,7 +53,7 @@ void added(void *rc, io_iterator_t it)
 {
     io_service_t device;
     while ((device = IOIteratorNext(it))) {
-        printf("[+] Device added.\n");
+        debug("[+] Device added.\n");
 
         IOServiceAddInterestNotification(port, device, kIOGeneralInterest, removed, NULL, &iter);
 
@@ -57,7 +64,7 @@ void added(void *rc, io_iterator_t it)
 int main(int argc, char** argv) {
     uid = getuid();
 
-    fprintf(stderr, "[+] Starting unpluggy, only locking for uid: %d\n", uid);
+    debug("[+] Starting unpluggy, only locking for uid: %d\n", uid);
 
     CFMutableDictionaryRef matching;
     CFNumberRef nr;
