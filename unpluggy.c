@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <signal.h>
 #include <sys/stat.h>
+#include <dlfcn.h>
 
 #include <CoreFoundation/CoreFoundation.h>
 
@@ -12,6 +13,8 @@
 static IONotificationPortRef port;
 static io_iterator_t iter;
 static CFRunLoopRef loop;
+
+void (*lock_session)(void);
 
 void handler(int sig)
 {
@@ -35,8 +38,7 @@ void removed(void *rc, io_service_t svc, natural_t type, void *arg)
         if (stat("/dev/console", &buf) == 0) {
             debug("[+] Console owned by %d\n", buf.st_uid);
             if (buf.st_uid == uid) {
-                /* TODO: Poke at CGSession in a less janky fashion */
-                system("\"/System/Library/CoreServices/Menu Extras/User.menu/Contents/Resources/CGSession\" -suspend");
+                lock_session();
             }
         } else {
             fprintf(stderr, "[!] Couldn't open /dev/console\n");
@@ -69,10 +71,22 @@ int main(int argc, char** argv) {
     CFRunLoopSourceRef loopsrc;
     kern_return_t kr;
 
+    void* handle;
+
     (void)signal(SIGINT, handler);
 
     matching = IOServiceMatching(kIOUSBDeviceClassName);
     if (matching == NULL) {
+        return -1;
+    }
+
+    handle = dlopen("/System/Library/CoreServices/Menu Extras/User.menu/Contents/MacOS/User", RTLD_LAZY);
+    if (handle == NULL) {
+        return -1;
+    }
+
+    lock_session = dlsym(handle, "SACSwitchToLoginWindow");
+    if (lock_session == NULL) {
         return -1;
     }
 
