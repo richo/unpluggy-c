@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <signal.h>
 #include <sys/stat.h>
-#include <dlfcn.h>
 
 #include <CoreFoundation/CoreFoundation.h>
 
@@ -10,16 +9,18 @@
 #include <IOKit/IOCFPlugIn.h>
 #include <IOKit/usb/IOUSBLib.h>
 
+#include "locker.h"
+
 static IONotificationPortRef port;
 static io_iterator_t iter;
 static CFRunLoopRef loop;
-
-void (*lock_session)(void);
 
 void handler(int sig)
 {
     exit(0);
 }
+
+void (*lock_session)(void);
 
 #ifdef DEBUG
 #define debug(...) fprintf(stderr, __VA_ARGS__)
@@ -71,7 +72,6 @@ int main(int argc, char** argv) {
     CFRunLoopSourceRef loopsrc;
     kern_return_t kr;
 
-    void* handle;
 
     (void)signal(SIGINT, handler);
 
@@ -80,13 +80,7 @@ int main(int argc, char** argv) {
         return -1;
     }
 
-    handle = dlopen("/System/Library/CoreServices/Menu Extras/User.menu/Contents/MacOS/User", RTLD_LAZY);
-    if (handle == NULL) {
-        return -1;
-    }
-
-    lock_session = dlsym(handle, "SACSwitchToLoginWindow");
-    if (lock_session == NULL) {
+    if (init_locker(&lock_session) != 0) {
         return -1;
     }
 
